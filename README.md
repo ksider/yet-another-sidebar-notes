@@ -1,8 +1,16 @@
 # Yet Another Sidebar Notes
 
-A compact, offline-first note space for the Chrome and Vivaldi side panel.
-
-**Open → write → archive.** No account, server, telemetry, sync, or network requests.
+<table>
+  <tr>
+    <td width="58%" valign="top">
+      <p>A compact, offline-first note space for the Chrome and Vivaldi side panel.</p>
+      <p><strong>Open → write → archive.</strong><br>No account, server, telemetry, sync, or network requests.</p>
+    </td>
+    <td width="42%" valign="top">
+      <img src="./pic.png" alt="Sidebar Notes in the browser side panel" width="300" />
+    </td>
+  </tr>
+</table>
 
 ## Install
 
@@ -38,7 +46,7 @@ Notes have stable IDs, content, creation/update/archive timestamps, and a reserv
 ## Included
 
 - Immediate editor focus, debounced local draft persistence, and automatic first-line titles.
-- Lightweight Markdown helpers for bold, italic, and bulleted lists, plus standard Cmd/Ctrl shortcuts for bold and italic.
+- Native inline formatting for bold, italic, and bulleted lists, with no rich-text framework.
 - Archive search, editing-in-place, copy, delete with five-second undo, and newest-first ordering.
 - System/light/dark appearance and validated JSON export/import.
 - Keyboard-accessible controls and compact layouts designed for 280–600px side panels.

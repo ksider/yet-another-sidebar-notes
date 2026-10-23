@@ -1,5 +1,6 @@
 import type { Draft, ImportResult, Note, NotesState, Theme } from './types';
 import { STORAGE_VERSION } from './types';
+import { noteText } from '../notes/content';
 
 const LEGACY_KEY = 'sidebar-notes';
 const VERSION_KEY = 'sidebar-notes:version';
@@ -58,7 +59,7 @@ export class StorageService {
     await this.migrate();
     const stored = await chrome.storage.local.get(DRAFT_KEY);
     const draft = isDraft(stored[DRAFT_KEY]) ? stored[DRAFT_KEY] : { content: '' };
-    const content = draft.content.trim();
+    const content = noteText(draft.content).trim();
     if (!content) return null;
     const notes = await this.readNotes();
     const now = new Date().toISOString();

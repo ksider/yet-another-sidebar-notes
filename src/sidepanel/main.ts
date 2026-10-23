@@ -1,6 +1,7 @@
 import '../styles/main.scss';
 import { StorageService } from '../services/storage/storage';
 import type { Draft, Note, Theme } from '../services/storage/types';
+import { noteText } from '../services/notes/content';
 
 const store = new StorageService();
 const app = document.querySelector<HTMLElement>('#app')!;
@@ -14,8 +15,8 @@ let undoTimer: number | undefined;
 let searchFrame: number | undefined;
 let deletedNote: Note | null = null;
 
-const titleFor = (content: string) => content.split(/\r?\n/).find((line) => line.trim())?.trim().slice(0, 90) || 'Untitled note';
-const previewFor = (content: string) => content.replace(/\s+/g, ' ').trim().slice(0, 130);
+const titleFor = (content: string) => noteText(content).split(/\r?\n/).find((line) => line.trim())?.trim().slice(0, 90) || 'Без названия';
+const previewFor = (content: string) => noteText(content).replace(/\s+/g, ' ').trim().slice(0, 130);
 const icon = (name: 'archive' | 'settings' | 'more' | 'copy' | 'edit' | 'trash' | 'back' | 'book' | 'check' | 'search' | 'download' | 'upload') => ({
   archive: '<path d="M3 5h18M5 5l1 15h12l1-15M9 9h6"/><path d="M10 13h4"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.1 2.1-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.55V20h-3v-.08A1.7 1.7 0 0 0 10.7 18.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.1-2.1.06-.06A1.7 1.7 0 0 0 7.06 15 1.7 1.7 0 0 0 5.5 14H5v-3h.5a1.7 1.7 0 0 0 1.56-1 1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.1-2.1.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 11.73 4.8V4h3v.8a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.1 2.1-.06.06A1.7 1.7 0 0 0 19.4 10 1.7 1.7 0 0 0 21 11v3a1.7 1.7 0 0 0-1.6 1Z"/>',
@@ -68,22 +69,22 @@ function renderEditor(): void {
   const isEditing = !!draft.editingId;
   app.innerHTML = shell(`<section class="panel editor-view">
     ${isEditing ? '<div class="editing-strip"><span>Редактирование записи</span><button data-action="back-to-archive">К архиву</button></div>' : ''}
-    <textarea id="editor" aria-label="${isEditing ? 'Текст архивной заметки' : 'Новая заметка'}" spellcheck="true" placeholder="Начните писать…">${escapeHtml(draft.content)}</textarea>
+    <div id="editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="${isEditing ? 'Текст архивной заметки' : 'Новая заметка'}" spellcheck="true" data-placeholder="Начните писать…">${toEditorHtml(draft.content)}</div>
     <footer class="editor-footer"><span id="save-status">${svg('check')}<span>${draft.content ? 'Черновик сохранён' : 'Локальный черновик'}</span></span>
       <div class="editor-actions"><div class="format-tools" aria-label="Разметка"><button data-format="bold" title="Жирный (Ctrl/Cmd+B)" aria-label="Жирный"><strong>B</strong></button><button data-format="italic" title="Курсив (Ctrl/Cmd+I)" aria-label="Курсив"><em>I</em></button><button data-format="list" title="Маркированный список" aria-label="Маркированный список">•≡</button></div>
-      ${isEditing ? '<span class="edit-updated">Сохраняется автоматически</span>' : `<button class="archive-button" data-action="archive" ${!draft.content.trim() ? 'disabled' : ''}>${svg('archive')} В архив</button>`}</div>
+      ${isEditing ? '<span class="edit-updated">Сохраняется автоматически</span>' : `<button class="archive-button" data-action="archive" ${!noteText(draft.content).trim() ? 'disabled' : ''}>${svg('archive')} В архив</button>`}</div>
     </footer>
   </section>`);
   bindShell();
-  const editor = document.querySelector<HTMLTextAreaElement>('#editor')!;
+  const editor = document.querySelector<HTMLElement>('#editor')!;
   editor.addEventListener('input', () => {
-    draft.content = editor.value;
+    draft.content = sanitizeRichHtml(editor.innerHTML);
     if (draft.editingId) {
       const index = notes.findIndex((note) => note.id === draft.editingId);
       if (index !== -1) notes[index] = { ...notes[index], content: draft.content, updatedAt: new Date().toISOString() };
     }
     const archive = document.querySelector<HTMLButtonElement>('[data-action="archive"]');
-    if (archive) archive.disabled = !draft.content.trim();
+    if (archive) archive.disabled = !noteText(draft.content).trim();
     document.querySelector('#save-status')!.innerHTML = `${svg('check')}<span>Сохранение…</span>`;
     window.clearTimeout(saveTimer);
     saveTimer = window.setTimeout(async () => {
@@ -96,42 +97,54 @@ function renderEditor(): void {
     button.addEventListener('mousedown', (event) => event.preventDefault());
     button.addEventListener('click', () => applyFormat(editor, button.dataset.format as 'bold' | 'italic' | 'list'));
   });
-  editor.addEventListener('keydown', (event) => {
-    if (!(event.metaKey || event.ctrlKey)) return;
-    if (event.key.toLowerCase() === 'b') { event.preventDefault(); applyFormat(editor, 'bold'); }
-    if (event.key.toLowerCase() === 'i') { event.preventDefault(); applyFormat(editor, 'italic'); }
-  });
   requestAnimationFrame(() => editor.focus());
 }
 
-function applyFormat(editor: HTMLTextAreaElement, format: 'bold' | 'italic' | 'list'): void {
-  const value = editor.value;
-  const start = editor.selectionStart;
-  const end = editor.selectionEnd;
-  let replacement = '';
-  let replacementStart = 0;
-  let replacementEnd = 0;
-  if (format === 'list') {
-    const lineStart = value.lastIndexOf('\n', start - 1) + 1;
-    const nextBreak = value.indexOf('\n', end);
-    const lineEnd = nextBreak === -1 ? value.length : nextBreak;
-    const lines = value.slice(lineStart, lineEnd).split('\n');
-    replacement = lines.map((line) => line.startsWith('- ') ? line.slice(2) : `- ${line}`).join('\n');
-    replacementStart = lineStart;
-    replacementEnd = lineStart + replacement.length;
-  } else {
-    const marker = format === 'bold' ? '**' : '*';
-    const selected = value.slice(start, end) || (format === 'bold' ? 'жирный текст' : 'курсив');
-    replacement = `${marker}${selected}${marker}`;
-    replacementStart = start + marker.length;
-    replacementEnd = replacementStart + selected.length;
-  }
-  const replaceStart = format === 'list' ? value.lastIndexOf('\n', start - 1) + 1 : start;
-  const replaceEnd = format === 'list' ? (value.indexOf('\n', end) === -1 ? value.length : value.indexOf('\n', end)) : end;
-  editor.value = `${value.slice(0, replaceStart)}${replacement}${value.slice(replaceEnd)}`;
-  editor.setSelectionRange(replacementStart, replacementEnd);
-  editor.dispatchEvent(new Event('input', { bubbles: true }));
+function applyFormat(editor: HTMLElement, format: 'bold' | 'italic' | 'list'): void {
   editor.focus();
+  document.execCommand(format === 'bold' ? 'bold' : format === 'italic' ? 'italic' : 'insertUnorderedList');
+}
+
+function toEditorHtml(content: string): string {
+  if (!content) return '';
+  // Existing plain notes remain readable; the former lightweight Markdown is
+  // rendered once on opening instead of exposing its formatting markers.
+  if (!/<\/?(?:strong|b|em|i|ul|ol|li|div|p|br)\b/i.test(content)) return plainTextToHtml(content);
+  return sanitizeRichHtml(content);
+}
+
+function plainTextToHtml(content: string): string {
+  const lines = content.split(/\r?\n/);
+  const blocks: string[] = [];
+  for (let index = 0; index < lines.length;) {
+    if (lines[index].startsWith('- ')) {
+      const items: string[] = [];
+      while (index < lines.length && lines[index].startsWith('- ')) items.push(`<li>${inlineMarkup(lines[index++].slice(2))}</li>`);
+      blocks.push(`<ul>${items.join('')}</ul>`);
+    } else blocks.push(inlineMarkup(lines[index++]));
+  }
+  return blocks.join('<br>');
+}
+
+function inlineMarkup(value: string): string {
+  return escapeHtml(value).replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>').replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+}
+
+function sanitizeRichHtml(value: string): string {
+  const template = document.createElement('template');
+  template.innerHTML = value;
+  const allowed = new Set(['STRONG', 'B', 'EM', 'I', 'UL', 'OL', 'LI', 'BR', 'DIV', 'P']);
+  const clean = (node: Node): void => {
+    for (const child of [...node.childNodes]) {
+      if (child.nodeType !== Node.ELEMENT_NODE) continue;
+      const element = child as HTMLElement;
+      if (!allowed.has(element.tagName)) { child.replaceWith(document.createTextNode(element.textContent ?? '')); continue; }
+      [...element.attributes].forEach((attribute) => element.removeAttribute(attribute.name));
+      clean(element);
+    }
+  };
+  clean(template.content);
+  return template.innerHTML;
 }
 
 function renderArchive(): void {
