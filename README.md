@@ -1,8 +1,7 @@
-# Yet Another Sidebar Notes
-
 <table>
   <tr>
     <td width="58%" valign="top">
+    <h1>Yet Another Sidebar Notes</h1>
       <p>A compact, offline-first note space for the Chrome and Vivaldi side panel.</p>
       <p><strong>Open → write → archive.</strong><br>No account, server, telemetry, sync, or network requests.</p>
     </td>
