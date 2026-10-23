@@ -5,7 +5,8 @@
     <td width="58%" valign="top">
       <p>A compact, offline-first note space for the Chrome and Vivaldi side panel.</p>
       <p><strong>Open → write → archive.</strong><br>No account, server, telemetry, sync, or network requests.</p>
-      ## Install
+
+## Install
 
 1. Clone the repository and open its root folder.
 2. Install dependencies with `npm install`.
@@ -14,6 +15,7 @@
 5. Pin **Sidebar Notes** if desired, then click its toolbar icon to open the side panel.
 
 The extension needs a browser version which supports the Manifest V3 Side Panel API. It has not been manually browser-tested as part of this implementation.
+
     </td>
     <td width="42%" valign="top">
       <img src="./pic.png" alt="Sidebar Notes in the browser side panel" width="300" />
